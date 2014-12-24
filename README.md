@@ -1,7 +1,7 @@
 # SWIFT IOC
 
 This is a simple Swift IOC container implementation. The entire implementation is
-contained (no pun intended) in the `Container.swift` file for quick copy-and-paste.
+contained (no pun intended) in the `section-1.swift` file for quick copy-and-paste.
 
 This project is meant to be cloned into an Xcode playground directory so it's easy to test
 and experiment.
