@@ -32,7 +32,7 @@ private class Container: Resolver {
     func resolve<T : AnyObject>() -> T {
         let name = NSStringFromClass(T)
         if let resolver = registrations[name] {
-            return resolver() as T
+            return resolver() as! T
 
         } else {
             fatalError("no registration for requested type.")
@@ -42,10 +42,6 @@ private class Container: Resolver {
 
 func singleton<T: AnyObject>(instance: T) -> Resolver {
     return Container(name: NSStringFromClass(T),        resolver: { () -> AnyObject in instance })
-}
-
-func auto<T: AnyObject>(factory: @autoclosure () -> T) -> Resolver {
-    return Container(name: NSStringFromClass(T), resolver: factory)
 }
 
 func factory<T: AnyObject>(factory: () -> T) -> Resolver {
@@ -66,18 +62,16 @@ prefix func <-<T: AnyObject>(resolver: Resolver) -> T {
     return resolver.resolve()
 }
 
+// ______________________________________________________________________
+//                                                                T E S T
 class TestObject {
     let id: String = NSUUID().UUIDString
     init() { dump("ctor") }}
 
-
-// ______________________________________________________________________
-//                                                                T E S T
 class Singleton: TestObject { }
-class Auto: TestObject { }
 class Factory: TestObject { }
 
-let container = singleton(Singleton()) + auto(Auto()) + factory({ Factory() })
+let container = singleton(Singleton()) + factory({ Factory() })
 
 var singleton: Singleton = <-container
 dump(singleton.id)
@@ -86,12 +80,14 @@ dump(singleton.id)
 singleton = <-container
 dump(singleton.id)
 
-var auto: Auto = <-container
-dump(auto.id)
-auto = <-container
-dump(auto.id)
-auto = <-container
-dump(auto.id)
+// In Swift1.2 @autoclosure now implies @noescape so we can no longer use it like what we did
+// previously.
+//var auto: Auto = <-container
+//dump(auto.id)
+//auto = <-container
+//dump(auto.id)
+//auto = <-container
+//dump(auto.id)
 
 var factory: Factory = <-container
 dump(factory.id)
