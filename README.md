@@ -21,10 +21,7 @@ Use one of these three methods to create a `Resolver`:
 // Registers a singleton object.
 let resolver = singleton(GlobalServiceObject())
 
-// Registers a factory via @autoclosure.
-let resolver = auto(UtilityObject())
-
-// Registers a factory function directly.
+// Registers a factory function.
 let resolver = factory({ () -> ComplexObject in
     let co = ComplexObject()
     co.complex = "setup"
