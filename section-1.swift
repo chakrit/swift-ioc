@@ -30,7 +30,7 @@ private class Container: Resolver {
     }
 
     func resolve<T : AnyObject>() -> T {
-        let name = NSStringFromClass(T)
+        let name = toString(T)
         if let resolver = registrations[name] {
             return resolver() as! T
 
@@ -41,11 +41,12 @@ private class Container: Resolver {
 }
 
 func singleton<T: AnyObject>(instance: T) -> Resolver {
-    return Container(name: NSStringFromClass(T),        resolver: { () -> AnyObject in instance })
+    return Container(name: toString(T),
+        resolver: { () -> AnyObject in instance })
 }
 
 func factory<T: AnyObject>(factory: () -> T) -> Resolver {
-    return Container(name: NSStringFromClass(T), resolver: factory)
+    return Container(name: toString(T), resolver: factory)
 }
 
 func +(lhs: Resolver, rhs: Resolver) -> Resolver {
@@ -66,7 +67,8 @@ prefix func <-<T: AnyObject>(resolver: Resolver) -> T {
 //                                                                T E S T
 class TestObject {
     let id: String = NSUUID().UUIDString
-    init() { dump("ctor") }}
+    init() { dump("ctor") }
+}
 
 class Singleton: TestObject { }
 class Factory: TestObject { }
