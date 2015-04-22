@@ -7,37 +7,49 @@ protocol Resolver {
     func resolve<T: AnyObject>() -> T
 }
 
+private class EmptyContainer: Resolver {
+    let registrations: Registry = [:]
+    
+    func resolve<T : AnyObject>() -> T {
+        fatalError("no registration for requested type.")
+    }
+}
+
 private class Container: Resolver {
     let registrations: Registry
-
+    
     init(name: String, resolver: () -> AnyObject) {
         registrations = [name: resolver]
     }
-
+    
     init(previousRegistrations: Registry, name: String, resolver: () -> AnyObject) {
         var merged = previousRegistrations
         merged[name] = resolver
         registrations = merged
     }
-
+    
     init(previousRegistrations: Registry, additionalRegistrations: Registry) {
         var merged = previousRegistrations
         for (key, value) in additionalRegistrations {
             merged[key] = value
         }
-
+        
         registrations = merged
     }
-
+    
     func resolve<T : AnyObject>() -> T {
         let name = toString(T)
         if let resolver = registrations[name] {
             return resolver() as! T
-
+            
         } else {
             fatalError("no registration for requested type.")
         }
     }
+}
+
+func emptyContainer() -> Resolver {
+    return EmptyContainer()
 }
 
 func singleton<T: AnyObject>(instance: T) -> Resolver {
@@ -51,7 +63,7 @@ func factory<T: AnyObject>(factory: () -> T) -> Resolver {
 
 func +(lhs: Resolver, rhs: Resolver) -> Resolver {
     return Container(previousRegistrations: lhs.registrations,
-    additionalRegistrations: rhs.registrations)
+        additionalRegistrations: rhs.registrations)
 }
 
 func +=(inout lhs: Resolver, rhs: Resolver) {
@@ -67,13 +79,15 @@ prefix func <-<T: AnyObject>(resolver: Resolver) -> T {
 //                                                                T E S T
 class TestObject {
     let id: String = NSUUID().UUIDString
-    init() { dump("ctor") }
+    init() { dump("ctor: \(id)") }
 }
 
 class Singleton: TestObject { }
 class Factory: TestObject { }
 
-let container = singleton(Singleton()) + factory({ Factory() })
+var container = emptyContainer()
+container += singleton(Singleton())
+container += factory({ Factory() })
 
 var singleton: Singleton = <-container
 dump(singleton.id)
@@ -97,3 +111,4 @@ factory = <-container
 dump(factory.id)
 factory = <-container
 dump(factory.id)
+
