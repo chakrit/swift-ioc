@@ -80,11 +80,12 @@ class RootViewController: ViewController {
 
 Enjoy!
 
-# TODOs
+# TODOs / PR material
 
 * Also registers as superclass type.
 * Overrides.
 * Explain modules system.
+* Cyclic check.
 
 # SUPPORT
 
