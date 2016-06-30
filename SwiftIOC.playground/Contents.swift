@@ -147,7 +147,7 @@ prefix func <-<T: AnyObject>(resolver: Resolver) -> T {
  */
 class TestObject {
     let id: String = NSUUID().UUIDString
-    init() { dump("ctor: \(id)") }
+    init() { print("**init** \(self.dynamicType) \(id)") }
 }
 
 class Singleton: TestObject { }
@@ -160,21 +160,24 @@ container += factory({ Factory() })
 let single1: Singleton = <-container
 let single2: Singleton = <-container
 let single3: Singleton = <-container
-print(single1.id == single2.id)
-print(single2.id == single3.id)
+print("singleton works: \(single1.id == single2.id)")
+print("singleton works: \(single2.id == single3.id)")
 
 let instance1: Factory = <-container
 let instance2: Factory = <-container
 let instance3: Factory = <-container
-print(instance1.id != instance2.id)
-print(instance2.id != instance3.id)
+print("factory works: \(instance1.id != instance2.id)")
+print("factory works: \(instance2.id != instance3.id)")
 
 class Dependent {
     let service: Singleton = <-container
     let instance: Factory = <-container
+    lazy var lazyInstance: Factory = <-container
 }
 
 let dependent1 = Dependent()
 let dependent2 = Dependent()
-print(dependent1.service === dependent2.service)
-print(dependent1.instance !== dependent2.instance)
+print("instance resolution works for singleton: \(dependent1.service === dependent2.service)")
+print("instance resolution works for factory:   \(dependent1.instance !== dependent2.instance)")
+print("lazy resolution works: \(dependent1.lazyInstance.id)")
+print("lazy resolution works: \(dependent2.lazyInstance.id)")
