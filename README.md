@@ -1,21 +1,20 @@
 # SWIFT IOC
 
 This is a simple Swift IOC container implementation. The entire implementation is
-contained (no pun intended) in the `section-1.swift` file for quick copy-and-paste.
-
-This project is meant to be cloned into an Xcode playground directory so it's easy to test
-and experiment.
+contained (no pun intended) in a single
+[`Contents.swift`](https://raw.githubusercontent.com/chakrit/swift-ioc/master/SwiftIOC.playground/Contents.swift)
+file for quick copy-and-paste into your project.
 
 # FEATURES
 
-* Simple API.
-* Tiny codebase. One file drop-in. You don't even need Cocoapods.
+* Simple API. Minimal code. Minimal concepts.
+* One file drop-in. You don't even need any dependency manager.
 * Immutable containers. Construct new ones by `+`-ing existing ones.
 * Can be used to make hierarchical container trees.
 
 # USAGE
 
-Use one of these three methods to create a `Resolver`:
+Register dependencies with either a `singleton` or a `factory` resolver:
 
 ```swift
 // Registers a singleton object.
@@ -31,19 +30,21 @@ let resolver = factory({ () -> ComplexObject in
 })
 ```
 
-Construct your container by merging `Resolver`s together:
+Construct your container by merging `Resolver`s together using the plus (`+`) operator:
 
 ```swift
-let container = singleton(Singleton()) + auto(Auto()) + factory({ Factory() })
+let container = singleton(ServiceOne()) + singleton(ServiceTwo()) + factory({ InstanceService() })
 ```
 
-Obtain dependencies in your `ViewController` by pulling from the `container`:
+Then to obtain dependencies, pull it out from the container you have just created using
+the reverse arrow (`<-`) operator:
 
 ```swift
 import UIKit
 
 class MyViewController: ViewController {
   let serviceObject: GlobalServiceObject = <-container
+  let anotherService: InstanceService = <-container
 
   override func viewDidLoad() {
     super.viewDidLoad()
@@ -52,7 +53,7 @@ class MyViewController: ViewController {
 }
 ```
 
-Dependencies can be lazy:
+Additionally, dependencies can be lazy:
 
 ```swift
 class X {
