@@ -7,7 +7,7 @@ file for quick copy-and-paste into your project.
 
 # FEATURES
 
-* Simple API. Minimal code. Minimal concepts.
+* Simple API. Minimal code (less than 100 LOC). Minimal concepts.
 * One file drop-in. You don't even need any dependency manager.
 * Immutable containers. Construct new ones by `+`-ing existing ones.
 * Can be used to make hierarchical container trees.
@@ -18,7 +18,7 @@ Register dependencies with either a `singleton` or a `factory` resolver:
 
 ```swift
 // Registers a singleton object.
-let resolver = singleton(GlobalServiceObject())
+let resolver = singleton({ _ in GlobalServiceObject() })
 
 // Registers a factory function.
 let resolver = factory({ (resolver) -> ComplexObject in
@@ -36,12 +36,14 @@ let resolver = factory({ Dependent(dependency: <-$0) })
 Construct your container by merging `Resolver`s together using the plus (`+`) operator:
 
 ```swift
-let container = singleton(ServiceOne()) + singleton(ServiceTwo()) + factory({ InstanceService() })
+let container = singleton({ _ in ServiceOne() }) +
+  singleton({ _ in ServiceTwo() }) +
+  factory({ _ in InstanceService() })
 
 // or mutable
 var container = emptyContainer()
-container += singleton(ServiceOne())
-container += singleton(ServiceTwo())
+container += singleton({ _ in ServiceOne() })
+container += singleton({ _ in ServiceTwo() })
 //...
 ```
 
@@ -79,10 +81,10 @@ Or hierarchical:
 ```swift
 import UIKit
 
-let topLevel = singleton(ServiceObject())
+let topLevel = singleton({ _ in ServiceObject() })
 
 class RootViewController: ViewController {
-  let container = topLevel + singleton(ViewUtility())
+  let container = topLevel + singleton({ _ in ViewUtility() })
 
   // ...
 }
@@ -101,7 +103,6 @@ Enjoy!
 
 # TODOs / PR material
 
-* Singleton builder + singleton guarantees.
 * Handles superclass types.
 * Overrides.
 * Modules system.

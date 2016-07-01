@@ -65,8 +65,38 @@
 
 import Foundation
 
-typealias Registry = [String: Builder]
+private typealias Registry = [String: ResolutionScope]
 typealias Builder = (Resolver) -> AnyObject
+
+private protocol ResolutionScope {
+    func build<T: AnyObject>(resolver: Resolver) -> T
+    init(builder: Builder)
+}
+
+private class DefaultScope: ResolutionScope {
+    let builder: Builder
+    
+    required init(builder: Builder) {
+        self.builder = builder
+    }
+    
+    func build<T: AnyObject>(resolver: Resolver) -> T {
+        return self.builder(resolver) as! T
+    }
+}
+
+private class SingletonScope: DefaultScope {
+    private var instance: AnyObject? = nil
+    private var onceToken: dispatch_once_t = dispatch_once_t()
+    
+    override func build<T: AnyObject>(resolver: Resolver) -> T {
+        dispatch_once(&onceToken) {
+            self.instance = self.builder(resolver)
+        }
+        
+        return instance! as! T
+    }
+}
 
 class Resolver {
     private let registrations: Registry
@@ -75,14 +105,14 @@ class Resolver {
         self.registrations = registry
     }
     
-    private init(name: String, builder: Builder) {
-        self.registrations = [name: builder]
+    private init(name: String, scope: ResolutionScope) {
+        self.registrations = [name: scope]
     }
     
     private func resolve<T: AnyObject>() -> T {
         let name = String(T)
-        if let builder = registrations[name] {
-            return builder(self) as! T
+        if let scope = registrations[name] {
+            return scope.build(self)
             
         } else {
             fatalError("no container registration for type \(name)")
@@ -94,12 +124,14 @@ func emptyContainer() -> Resolver {
     return Resolver(registry: [:])
 }
 
-func singleton<T: AnyObject>(instance: T) -> Resolver {
-    return Resolver(registry: [String(T): { _ in instance }])
+func singleton<T: AnyObject>(builder: (Resolver) -> T) -> Resolver {
+    let scope = SingletonScope(builder: builder)
+    return Resolver(registry: [String(T): scope])
 }
 
 func factory<T: AnyObject>(builder: (Resolver) -> T) -> Resolver {
-    return Resolver(registry: [String(T): builder])
+    let scope = DefaultScope(builder: builder)
+    return Resolver(registry: [String(T): scope])
 }
 
 func +(lhs: Resolver, rhs: Resolver) -> Resolver {
@@ -145,7 +177,7 @@ class Singleton: TestObject { }
 class Factory: TestObject { }
 
 var container = emptyContainer()
-container += singleton(Singleton())
+container += singleton({ _ in Singleton() })
 container += factory({ _ in Factory() })
 
 let single1: Singleton = <-container
@@ -176,29 +208,33 @@ print("lazy resolution works: \(dependent1.lazyInstance.id)")
 print("lazy resolution works: \(dependent2.lazyInstance.id)")
 
 
-print(" ====================================== OUT-OF-ORDER REGISTRATION ")
+print(" ====================================== COMPLEX OUT-OF-ORDER REGISTRATION ")
 class Inner: TestObject { }
 
 class Outer: TestObject {
-    let inner: Inner
+    let inner1: Inner
+    let inner2: Inner
     
-    init(inner dependency: Inner) {
-        self.inner = dependency
+    init(inner one: Inner, another two: Inner) {
+        self.inner1 = one
+        self.inner2 = two
     }
 }
 
 class Wrapper: TestObject {
     let outer: Outer
     
-    init(outer dependency: Outer) {
-        self.outer = dependency
+    init(outer: Outer) {
+        self.outer = outer
     }
 }
 
 container = emptyContainer()
 container += factory({ Wrapper(outer: <-$0) })
-container += factory({ Outer(inner: <-$0) })
+container += singleton({ Outer(inner: <-$0, another: <-$0) })
 container += factory({ _ in Inner() })
 
-let completed: Wrapper = <-container
-print("out-of-order resolution: \(completed.id) \(completed.outer.id) \(completed.outer.inner.id)")
+let wrapper1: Wrapper = <-container
+let wrapper2: Wrapper = <-container
+print("out-of-order resolution: \(wrapper1.id) \(wrapper1.outer.id) \(wrapper1.outer.inner1.id) \(wrapper1.outer.inner2.id)")
+print("out-of-order resolution: \(wrapper2.id) \(wrapper2.outer.id) \(wrapper2.outer.inner1.id) \(wrapper2.outer.inner2.id)")
