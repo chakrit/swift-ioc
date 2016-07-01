@@ -21,19 +21,28 @@ Register dependencies with either a `singleton` or a `factory` resolver:
 let resolver = singleton(GlobalServiceObject())
 
 // Registers a factory function.
-let resolver = factory({ () -> ComplexObject in
+let resolver = factory({ (resolver) -> ComplexObject in
     let co = ComplexObject()
-    co.complex = "setup"
+    co.innerDependency = <-resolver
     co.invokeMethod()
 
     return co
 })
+
+// Registers a factory function using Swift shorthand lambda form
+let resolver = factory({ Dependent(dependency: <-$0) })
 ```
 
 Construct your container by merging `Resolver`s together using the plus (`+`) operator:
 
 ```swift
 let container = singleton(ServiceOne()) + singleton(ServiceTwo()) + factory({ InstanceService() })
+
+// or mutable
+var container = emptyContainer()
+container += singleton(ServiceOne())
+container += singleton(ServiceTwo())
+//...
 ```
 
 Then to obtain dependencies, pull it out from the container you have just created using
@@ -79,13 +88,23 @@ class RootViewController: ViewController {
 }
 ```
 
+Or registered out-of-order:
+
+```swift
+var container = emptyContainer()
+container += factory({ One(requireTwo: <-$0 })
+container += factory({ Two(requireThree: <-$0 })
+container += factory({ Three() })
+```
+
 Enjoy!
 
 # TODOs / PR material
 
-* Also registers as superclass type.
+* Singleton builder + singleton guarantees.
+* Handles superclass types.
 * Overrides.
-* Explain modules system.
+* Modules system.
 * Cyclic check.
 
 # SUPPORT
