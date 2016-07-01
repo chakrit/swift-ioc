@@ -1,7 +1,7 @@
 /*:
  # SWIFT-IOC
  
- See the accompanying README.md file for full details. This playground as copy-pastable source code and as a quickstart.
+ See the accompanying README.md file for full details. This playground acts as copy-pastable source code and as a quickstart.
  
  First build some `Resolver`s:
  
@@ -65,74 +65,55 @@
 
 import Foundation
 
-typealias Registry = [String: () -> AnyObject]
+typealias Registry = [String: Builder]
+typealias Builder = (Resolver) -> AnyObject
 
-protocol Resolver {
-    var registrations: Registry { get }
-    func resolve<T: AnyObject>() -> T
-}
-
-private class EmptyContainer: Resolver {
-    let registrations: Registry = [:]
-
-    func resolve<T : AnyObject>() -> T {
-        fatalError("no registration for requested type.")
+class Resolver {
+    private let registrations: Registry
+    
+    private init(registry: Registry) {
+        self.registrations = registry
     }
-}
-
-private class Container: Resolver {
-    let registrations: Registry
-
-    init(name: String, resolver: () -> AnyObject) {
-        registrations = [name: resolver]
+    
+    private init(name: String, builder: Builder) {
+        self.registrations = [name: builder]
     }
-
-    init(previousRegistrations: Registry, name: String, resolver: () -> AnyObject) {
-        var merged = previousRegistrations
-        merged[name] = resolver
-        registrations = merged
-    }
-
-    init(previousRegistrations: Registry, additionalRegistrations: Registry) {
-        var merged = previousRegistrations
-        for (key, value) in additionalRegistrations {
-            merged[key] = value
-        }
-
-        registrations = merged
-    }
-
-    func resolve<T : AnyObject>() -> T {
+    
+    private func resolve<T: AnyObject>() -> T {
         let name = String(T)
-        if let resolver = registrations[name] {
-            return resolver() as! T
-
+        if let builder = registrations[name] {
+            return builder(self) as! T
+            
         } else {
-            fatalError("no registration for requested type.")
+            fatalError("no container registration for type \(name)")
         }
     }
 }
 
 func emptyContainer() -> Resolver {
-    return EmptyContainer()
+    return Resolver(registry: [:])
 }
 
 func singleton<T: AnyObject>(instance: T) -> Resolver {
-    return Container(name: String(T),
-                     resolver: { () -> AnyObject in instance })
+    return Resolver(registry: [String(T): { _ in instance }])
 }
 
-func factory<T: AnyObject>(factory: () -> T) -> Resolver {
-    return Container(name: String(T), resolver: factory)
+func factory<T: AnyObject>(builder: (Resolver) -> T) -> Resolver {
+    return Resolver(registry: [String(T): builder])
 }
 
 func +(lhs: Resolver, rhs: Resolver) -> Resolver {
-    return Container(previousRegistrations: lhs.registrations,
-                     additionalRegistrations: rhs.registrations)
+    var merged: Registry = lhs.registrations
+    for (name, builder) in rhs.registrations {
+        merged[name] = builder
+    }
+    
+    return Resolver(registry: merged)
 }
 
-func +=(inout lhs: Resolver, rhs: Resolver) {
+func +=(inout lhs: Resolver, rhs: Resolver) -> Resolver {
     lhs = lhs + rhs
+    return rhs
 }
 
 prefix operator <- {}
@@ -145,17 +126,27 @@ prefix func <-<T: AnyObject>(resolver: Resolver) -> T {
 
  ### Tests
  */
+var counter: Int = 0
+
 class TestObject {
-    let id: String = NSUUID().UUIDString
-    init() { print("**init** \(self.dynamicType) \(id)") }
+    let id: Int
+    
+    init() {
+        counter += 1
+        self.id = counter
+        
+        print("   creating: \(self.dynamicType) \(self.id)")
+    }
 }
 
+
+print(" ====================================== BASIC SETUP ")
 class Singleton: TestObject { }
 class Factory: TestObject { }
 
 var container = emptyContainer()
 container += singleton(Singleton())
-container += factory({ Factory() })
+container += factory({ _ in Factory() })
 
 let single1: Singleton = <-container
 let single2: Singleton = <-container
@@ -169,7 +160,9 @@ let instance3: Factory = <-container
 print("factory works: \(instance1.id != instance2.id)")
 print("factory works: \(instance2.id != instance3.id)")
 
-class Dependent {
+
+print(" ====================================== IMPLICIT PULLING ")
+class Dependent: TestObject {
     let service: Singleton = <-container
     let instance: Factory = <-container
     lazy var lazyInstance: Factory = <-container
@@ -181,3 +174,31 @@ print("instance resolution works for singleton: \(dependent1.service === depende
 print("instance resolution works for factory:   \(dependent1.instance !== dependent2.instance)")
 print("lazy resolution works: \(dependent1.lazyInstance.id)")
 print("lazy resolution works: \(dependent2.lazyInstance.id)")
+
+
+print(" ====================================== OUT-OF-ORDER REGISTRATION ")
+class Inner: TestObject { }
+
+class Outer: TestObject {
+    let inner: Inner
+    
+    init(inner dependency: Inner) {
+        self.inner = dependency
+    }
+}
+
+class Wrapper: TestObject {
+    let outer: Outer
+    
+    init(outer dependency: Outer) {
+        self.outer = dependency
+    }
+}
+
+container = emptyContainer()
+container += factory({ Wrapper(outer: <-$0) })
+container += factory({ Outer(inner: <-$0) })
+container += factory({ _ in Inner() })
+
+let completed: Wrapper = <-container
+print("out-of-order resolution: \(completed.id) \(completed.outer.id) \(completed.outer.inner.id)")
