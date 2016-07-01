@@ -7,7 +7,8 @@ file for quick copy-and-paste into your project.
 
 # FEATURES
 
-* Simple API. Minimal code (less than 100 LOC). Minimal concepts.
+* Simple API. Minimal concepts.
+* Tiny file. Minimal code (less than 100 LOC w/o docs).
 * One file drop-in. You don't even need any dependency manager.
 * Immutable containers. Construct new ones by `+`-ing existing ones.
 * Can be used to make hierarchical container trees.
