@@ -70,16 +70,16 @@ typealias Builder = (Resolver) -> AnyObject
 
 private protocol ResolutionScope {
     func build<T: AnyObject>(resolver: Resolver) -> T
-    init(builder: Builder)
+    init(builder: @escaping Builder)
 }
 
 private class DefaultScope: ResolutionScope {
     let builder: Builder
-    
-    required init(builder: Builder) {
+
+    required init(builder: @escaping Builder) {
         self.builder = builder
     }
-    
+
     func build<T: AnyObject>(resolver: Resolver) -> T {
         return self.builder(resolver) as! T
     }
@@ -87,33 +87,32 @@ private class DefaultScope: ResolutionScope {
 
 private class SingletonScope: DefaultScope {
     private var instance: AnyObject? = nil
-    private var onceToken: dispatch_once_t = dispatch_once_t()
-    
+
     override func build<T: AnyObject>(resolver: Resolver) -> T {
-        dispatch_once(&onceToken) {
+        if(self.instance == nil) {
             self.instance = self.builder(resolver)
         }
-        
+
         return instance! as! T
     }
 }
 
 class Resolver {
-    private let registrations: Registry
-    
-    private init(registry: Registry) {
+    fileprivate let registrations: Registry
+
+    fileprivate init(registry: Registry) {
         self.registrations = registry
     }
-    
+
     private init(name: String, scope: ResolutionScope) {
         self.registrations = [name: scope]
     }
-    
-    private func resolve<T: AnyObject>() -> T {
-        let name = String(T)
+
+    fileprivate func resolve<T: AnyObject>() -> T {
+        let name: String = NSStringFromClass(T.self)
         if let scope = registrations[name] {
-            return scope.build(self)
-            
+            return scope.build(resolver: self)
+
         } else {
             fatalError("no container registration for type \(name)")
         }
@@ -124,14 +123,14 @@ func emptyContainer() -> Resolver {
     return Resolver(registry: [:])
 }
 
-func singleton<T: AnyObject>(builder: (Resolver) -> T) -> Resolver {
+func singleton<T: AnyObject>(builder: @escaping (Resolver) -> T) -> Resolver {
     let scope = SingletonScope(builder: builder)
-    return Resolver(registry: [String(T): scope])
+    return Resolver(registry: [NSStringFromClass(T.self): scope])
 }
 
-func factory<T: AnyObject>(builder: (Resolver) -> T) -> Resolver {
+func factory<T: AnyObject>(builder: @escaping (Resolver) -> T) -> Resolver {
     let scope = DefaultScope(builder: builder)
-    return Resolver(registry: [String(T): scope])
+    return Resolver(registry: [NSStringFromClass(T.self): scope])
 }
 
 func +(lhs: Resolver, rhs: Resolver) -> Resolver {
@@ -139,16 +138,16 @@ func +(lhs: Resolver, rhs: Resolver) -> Resolver {
     for (name, builder) in rhs.registrations {
         merged[name] = builder
     }
-    
+
     return Resolver(registry: merged)
 }
 
-func +=(inout lhs: Resolver, rhs: Resolver) -> Resolver {
+func +=(lhs: inout Resolver, rhs: Resolver) -> Resolver {
     lhs = lhs + rhs
     return rhs
 }
 
-prefix operator <- {}
+prefix operator <-
 prefix func <-<T: AnyObject>(resolver: Resolver) -> T {
     return resolver.resolve()
 }
